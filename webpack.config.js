@@ -17,6 +17,7 @@ module.exports = {
         extensions: ['', '.js', '.jsx'],
         root: [
             path.resolve('.'),
+            path.resolve('./src'),
             path.resolve('./node_modules')
         ]
     },
