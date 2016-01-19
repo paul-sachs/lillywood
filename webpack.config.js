@@ -7,13 +7,18 @@ module.exports = {
     'webpack/hot/only-dev-server',
     './index.jsx' // Your appʼs entry point
   ],
+
     devtool: process.env.WEBPACK_DEVTOOL || 'source-map',
     output: {
         path: path.join(__dirname, 'public'),
         filename: 'bundle.js'
     },
     resolve: {
-        extensions: ['', '.js', '.jsx']
+        extensions: ['', '.js', '.jsx'],
+        root: [
+            path.resolve('.'),
+            path.resolve('./node_modules')
+        ]
     },
     module: {
         loaders: [
