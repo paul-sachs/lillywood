@@ -11,7 +11,13 @@ export default class PeerVideo extends React.Component {
   static props = {
     localPeer:    PropTypes.object.isRequired,
     localStream:  PropTypes.object.isRequired,
-    targetPeerID: PropTypes.string.isRequired
+    targetPeerID: PropTypes.string.isRequired,
+    onClose:      PropTypes.func,
+  };
+
+
+  static defaultProps = {
+    onClose: () => {}
   };
 
   componentWillMount() {
@@ -31,6 +37,8 @@ export default class PeerVideo extends React.Component {
       return;
 
     mediaConnection.on('stream', this._handleStream);
+    mediaConnection.on('close', this._hadnleClose);
+    mediaConnection.on('error', this._handleClose);
     mediaConnection.answer(localStream);
   };
 
@@ -38,6 +46,11 @@ export default class PeerVideo extends React.Component {
     this.setState({
       streamSrc: URL.createObjectURL(stream)
     });
+  };
+
+  _handleClose = (error) => {
+    console.log("Closseresdsd");
+    this.props.onClose(this.props.targetPeerID, error);
   };
 
 

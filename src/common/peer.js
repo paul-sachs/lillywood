@@ -6,4 +6,6 @@ export default class Peer extends PeerJS {
   constructor() {
     return super({key: PeerAPIKey, debug: 3})
   }
+
+
 }

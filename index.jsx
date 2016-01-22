@@ -4,6 +4,7 @@ import { render } from 'react-dom';
 import { Router, Route, Link, browserHistory } from 'react-router'
 import PeerVideo from 'components/PeerVideo';
 import Peer from 'common/peer';
+import _ from 'lodash'
 
 import Rebase from 're-base';
 const base = Rebase.createClass('https://lillywood.firebaseio.com/rebase-chat');
@@ -23,10 +24,11 @@ export class App extends React.Component {
      * our local 'peersInRoom' state whenever our 'peers/#roomid'
      * Firebase endpoint changes.
      */
-    base.bindToState(`peers/${roomID}`, {
+    base.syncState(`peers/${roomID}`, {
       context: this,
       state: 'peersInRoom',
-      asArray: true
+      asArray: true,
+      then: this.createPeer
     });
 
     window.navigator.getUserMedia({audio: true, video: true}, (stream) => {
@@ -35,11 +37,6 @@ export class App extends React.Component {
         localStream: stream
       });
     }, () => { console.log('error')});
-
-    const localPeer = new Peer();
-    localPeer.on('open', this._handleOpen);
-
-    this.setState({localPeer: localPeer});
   }
 
 	render() {
@@ -55,21 +52,22 @@ export class App extends React.Component {
 		);
 	}
 
+  createPeer = () => {
+    const localPeer = new Peer();
+    localPeer.on('open', this._handleOpen);
+    localPeer.on('error', this._handleError);
+    this.setState({localPeer: localPeer});
+  };
+
+  _handleError = (error) => {
+    console.log("ernkjsndfjkorr");
+    console.log(error);
+  };
+
   _handleOpen = (id) => {
-    console.log("Adding id "+id+" to list:");
-    console.log(this.state.peersInRoom);
-    // Push new ID to db
-    base.post(`peers/${roomID}`, {
-      data: this.state.peersInRoom.concat(id),
-      context: this,
-      /*
-       * This 'then' method will run after the
-       * post has finished.
-       */
-      then: () => {
-        console.log('POSTED');
-      }
-    });
+    this.setState({
+      peersInRoom: this.state.peersInRoom.concat(id)
+    })
   };
 
   _getPeerVideos = () => {
@@ -80,7 +78,18 @@ export class App extends React.Component {
     return this.state.peersInRoom.filter((peerID) => {
       return peerID!=localPeer.id;
     }).map((peerID, index) => {
-      return <PeerVideo key={index} localStream={localStream} localPeer={localPeer} targetPeerID={peerID}/>
+      return <PeerVideo key={index} localStream={localStream} localPeer={localPeer} targetPeerID={peerID} onClose={this._handlePeerClose}/>
+    });
+  };
+
+  _handlePeerClose = (id) => {
+    const { localPeer, peersInRoom} = this.state;
+    localPeer.disconnect();
+    console.log("Unmounting: "+localPeer.id);
+    // For now, just remove it from firebase.
+    let index = peersInRoom.indexOf(localPeer.id);
+    this.setState({
+      peersInRoom: peersInRoom.splice(index, 1)
     });
   };
 }
