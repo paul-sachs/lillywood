@@ -22,6 +22,7 @@ module.exports = {
         ]
     },
     module: {
+        noParse: [ 'skylinkjs' ],
         loaders: [
             {
                 test: /\.jsx?$/,
@@ -68,7 +69,8 @@ module.exports = {
         contentBase: "./public",
         noInfo: true, //  --no-info option
         hot: true,
-        inline: true
+        inline: true,
+        stats: 'errors-only'
     },
     plugins: [
       new webpack.NoErrorsPlugin()

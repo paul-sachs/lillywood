@@ -23,6 +23,7 @@
   "homepage": "https://github.com/alicoding/react-webpack-babel#readme",
   "dependencies": {
     "history": "^1.17.0",
+    "imports-loader": "^0.6.5",
     "lodash": "^3.10.1",
     "node-libs-browser": "0.5.3",
     "peerjs": "^0.3.14",
