@@ -2,7 +2,7 @@
 import React from 'react';
 import { render } from 'react-dom';
 import { Router, Route, Link, browserHistory } from 'react-router'
-import PeerVideo from 'components/PeerVideo';
+import VideoStream from 'components/VideoStream';
 import _ from 'lodash'
 
 import WebRTC from 'common/WebRTC';
@@ -27,37 +27,25 @@ const Constants = {
 
 export class App extends React.Component {
   state = {
-    users: [
-      {
-        id: 0,
-        name: '',
-        stream: null,
-        audioMute: false,
-        videoMute: false,
-        screensharing: false,
-        updatedStreamRender: 0
-      }
-    ],
+    users: [],
     state: Constants.AppState.FOYER,
     controls: true,
     chat: true,
-    room: {
-      id: '',
-      messages: [],
-      isLocked: false,
-      status: Constants.RoomState.IDLE,
-      useMCU: false
-    }
+    room: {},
+    myPeerInfo: {},
+    myPeerId: null,
+    myStream: null
   };
 
   componentWillMount() {
     WebRTC.setLogLevel(WebRTC.LOG_LEVEL.DEBUG);
 
-    WebRTC.on('readyStateChange', (state) => {
+    WebRTC.on('readyStateChange', (state, error, room) => {
       if(state === 0) {
         console.log("IDLE!!");
         this.setState({
           room: _.extend(this.state.room, {
+            name: room,
             status: Constants.RoomState.IDLE
           })
         });
@@ -66,6 +54,7 @@ export class App extends React.Component {
         console.log("CONNECTING!!");
         this.setState({
           room: _.extend(this.state.room, {
+            name: room,
             status: Constants.RoomState.CONNECTING
           })
         });
@@ -74,6 +63,7 @@ export class App extends React.Component {
          console.log("CONNECTED!!");
         this.setState({
           room: _.extend(this.state.room, {
+            name: room,
             status: Constants.RoomState.CONNECTED
           })
         });
@@ -81,6 +71,7 @@ export class App extends React.Component {
       else if(state === -1) {
         this.setState({
           room: _.extend(this.state.room, {
+            name: room,
             status: Constants.RoomState.LOCKED
           })
         });
@@ -88,6 +79,7 @@ export class App extends React.Component {
     });
 
     WebRTC.on("channelError", (error) => {
+      console.log("channelError");
       this.setState({
         room: _.extend(this.state.room, {
           status: Constants.RoomState.IDLE,
@@ -101,7 +93,13 @@ export class App extends React.Component {
     });
 
     WebRTC.on('peerJoined', (peerId, peerInfo, isSelf) => {
-      if(this.state.users.length === ConfigmaxUsers || isSelf) {
+      console.log("peerJoined:"+peerId);
+      console.log(peerInfo);
+      if(isSelf) {
+        this.setState({
+          myPeerId: peerId,
+          myPeerInfo: peerInfo
+        });
         return;
       }
 
@@ -118,40 +116,44 @@ export class App extends React.Component {
         })
       };
 
-      if(peerInfo.userData.screensharing) {
-        state.room = _.extend(this.state.room, {
-          screensharing: peerInfo.userData.screensharing
-        });
-      }
-
       this.setState(state);
     });
 
     WebRTC.on('incomingStream', (peerId, stream, isSelf) => {
-      var state = {
+      console.log("incomingStream:"+peerId);
+      console.log(stream);
+      if(isSelf) {
+        this.setState({
+          myStream: stream
+        });
+        return;
+      }
+
+      this.setState({
         users: this.state.users.map( (user) => {
-          if((isSelf && user.id === 0) || user.id === peerId) {
+          if(user.id === peerId) {
             user.stream = stream;
             user.updatedStreamRender += 1;
           }
           return user;
         })
-      };
-
-      if(this.state.users.length === Config.maxUsers) {
-        WebRTC.lockRoom();
-      }
-      else if(this.state.users.length >= 2) {
-        state.controls = false;
-      }
-
-      this.setState(state);
+      });
     });
 
     WebRTC.on('peerUpdated', (peerId, peerInfo, isSelf) => {
-      var state = {
+      console.log("peerUpdated:"+peerId);
+      console.log(peerInfo);
+      if(isSelf) {
+        this.setState({
+          myPeerId: peerId,
+          myPeerInfo: peerInfo
+        });
+        return;
+      }
+
+      this.setState({
         users: this.state.users.map( (user) => {
-          if((isSelf && user.id === 0) || user.id === peerId) {
+          if(user.id === peerId) {
             user.audioMute = peerInfo.mediaStatus.audioMuted;
             user.videoMute = peerInfo.mediaStatus.videoMuted;
             user.screensharing = peerInfo.userData.screensharing;
@@ -159,41 +161,22 @@ export class App extends React.Component {
           }
           return user;
         })
-      };
-
-      if(this.state.users[0].screensharing === false) {
-        state.room = _.extend(this.state.room, {
-          screensharing: peerInfo.userData.screensharing
-        });
-      }
-
-      this.setState(state);
+      });
     });
 
     WebRTC.on('peerLeft', (peerId, peerInfo, isSelf) => {
-      var state = {
+      console.log("peerLeft:"+peerId);
+      console.log(peerInfo);
+      this.setState({
         users: this.state.users.filter((user) => {
             return user.id !== peerId;
           })
-      };
-
-      if(state.users.length === Config.maxUsers - 1) {
-        WebRTC.unlockRoom();
-      }
-      else if(state.users.length === 1) {
-        state.controls = true;
-
-        if(!this.state.users[0].screensharing) {
-          state.room = _.extend(this.state.room, {
-            screensharing: false
-          });
-        }
-      }
-
-      this.setState(state);
+      });
     });
 
     WebRTC.on("roomLock", (isLocked) => {
+      console.log("peerLeft:"+peerId);
+      console.log(peerInfo);
       this.setState({
         room: _.extend(this.state.room, {
           isLocked: isLocked
@@ -202,6 +185,9 @@ export class App extends React.Component {
     });
 
     WebRTC.on("systemAction", (action, message, reason) => {
+      console.log("systemAction:"+action);
+      console.log(message);
+      console.log(reason);
       if(reason === WebRTC.SYSTEM_ACTION_REASON.ROOM_LOCKED) {
         this.setState({
           room: _.extend(this.state.room, {
@@ -216,49 +202,18 @@ export class App extends React.Component {
 
   Dispatcher = {
     sharescreen: (enable) => {
-      this.setState({
-        users: this.state.users.map( (user) => {
-          if(user.id === 0) {
-            user.screensharing = enable;
-          }
-          return user;
-        }),
-        room: _.extend(this.state.room, {
-          screensharing: enable
-        })
-      });
+       // TODO: TRANSITION
       WebRTC.setUserData({
         name: this.state.users[0].name,
         screensharing: enable
       });
     },
-    setMCU: (state) => {
-      this.setState({
-        room: _.extend(this.state.room, {
-          useMCU: !!state
-        })
-      });
-    },
     setName: (name) => {
-      this.setState({
-        users: this.state.users.map( (user) => {
-          if(user.id === 0) {
-            user.name = name;
-          }
-          return user;
-        })
-      });
+       // TODO: TRANSITION
       WebRTC.setUserData({
         name: name,
         screensharing: this.state.users[0].screensharing
       });
-    },
-    toggleControls: (state) => {
-      if(this.state.room.status === Constants.RoomState.CONNECTED) {
-        this.setState({
-          controls: state !== undefined ? state : !this.state.controls
-        });
-      }
     }
   };
 
@@ -267,15 +222,8 @@ export class App extends React.Component {
       return;
     }
     room = room.toString();
-    this.setState({
-      state: Constants.AppState.IN_ROOM,
-      room: _.extend(this.state.room, {
-        id: room,
-        status: Constants.RoomState.IDLE,
-        screensharing: false
-      }),
-      controls: true
-    });
+
+    // TODO: TRANSITION
 
     WebRTC.init({
       apiKey: Config.apiMCUKey,
@@ -297,9 +245,21 @@ export class App extends React.Component {
         </div>
         <input type='text' ref='roomName'/>
         <button onClick={this.handleButton}>Join Room</button>
+        <div className='peers'>
+          { this._getPeerVideos() }
+        </div>
+        <div className='myStream'>
+          <VideoStream stream={this.state.myStream}/>
+        </div>
       </div>
 		);
 	}
+
+  _getPeerVideos = () => {
+    return this.state.users.map( (user) =>
+      <VideoStream stream={user.stream}/>
+    );
+  };
 
   handleButton = () => {
     const roomName = this.refs.roomName.value;
