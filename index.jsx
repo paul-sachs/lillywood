@@ -1,19 +1,20 @@
 //require("./node_modules/bootstrap/dist/css/bootstrap.min.css")
 import React from 'react';
 import { render } from 'react-dom';
-import { Router, Route, Link } from 'react-router';
-import History from 'history';
+import { Router, Route, Link, browserHistory } from 'react-router';
 
+import WebRTC from 'common/WebRTC';
 import RoomSession from 'components/RoomSession';
-
 import Rebase from 're-base';
-import Config from 'config';
 
 const base = Rebase.createClass('https://lillywood.firebaseio.com/building1');
 
+const userID = 'user1';
+
 export class App extends React.Component {
   state = {
-    rooms: {}
+    rooms: {},
+    currentRoomName: null
   };
 
   static contextTypes = {
@@ -21,10 +22,26 @@ export class App extends React.Component {
   };
 
   componentDidMount() {
-    base.syncState('rooms', {
+    base.bindToState('rooms', {
       context: this,
       state: 'rooms',
       asArray: false
+    });
+  }
+
+  componentWillMount() {
+    WebRTC.on('readyStateChange', (state, error, room) => {
+      if (state===2) {
+        // Connected!
+        base.post(`rooms/${room}/participants/${userID}`, {data: true});
+        base.post(`users/${userID}/rooms/${room}`, {data: true});
+        if (this.state.currentRoomName != null){
+          base.post(`rooms/${this.state.currentRoomName}/participants/${userID}`, {data: false});
+          base.post(`users/${userID}/rooms/${this.state.currentRoomName}`, {data: false});
+        }
+
+        this.setState({currentRoomName: room});
+      }
     });
   }
 
@@ -50,12 +67,14 @@ export class App extends React.Component {
   };
 }
 
-const RoomSessionRoute = ({params}) => (
-  <RoomSession roomName={params.roomName} config={Config}/>
+const RoomSessionRoute = ({params, ...otherProps}) => (
+  <RoomSession
+    roomName={params.roomName}
+    {...otherProps} />
 );
 
 render((
-  <Router history={History}>
+  <Router history={browserHistory}>
     <Route path="/" component={App}>
       <Route path="/room/:roomName" component={RoomSessionRoute}/>
     </Route>

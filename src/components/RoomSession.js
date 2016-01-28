@@ -4,9 +4,7 @@ import VideoStream from 'components/VideoStream';
 import _ from 'lodash'
 
 import WebRTC from 'common/WebRTC';
-import Rebase from 're-base';
-
-const base = Rebase.createClass('https://lillywood.firebaseio.com/building1');
+import Config from 'config';
 
 const Constants = {
   RoomState: {
@@ -22,8 +20,7 @@ const Constants = {
 
 export default class RoomSession extends Component {
   static props = {
-    roomName: PropTypes.string.isRequired,
-    config: PropTypes.object.isRequired
+    roomName: PropTypes.string.isRequired
   };
 
   state = {
@@ -52,7 +49,6 @@ export default class RoomSession extends Component {
   }
 
   componentDidMount() {
-    debugger;
     this.joinRoom(this.props.roomName);
   }
 
@@ -245,7 +241,7 @@ export default class RoomSession extends Component {
     // TODO: TRANSITION
 
     WebRTC.init({
-      apiKey: this.props.config.apiMCUKey,
+      apiKey: Config.apiMCUKey,
       defaultRoom: room
     }, () => {
       WebRTC.joinRoom({

@@ -66,11 +66,12 @@ module.exports = {
              ]
     },
     devServer: {
-        contentBase: "./public",
+        contentBase: "public/",
         noInfo: true, //  --no-info option
         hot: true,
         inline: true,
-        stats: 'errors-only'
+        stats: 'errors-only',
+        historyApiFallback: true
     },
     plugins: [
       new webpack.NoErrorsPlugin()
