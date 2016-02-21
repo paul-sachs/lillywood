@@ -7,8 +7,10 @@ import WebRTC from 'common/WebRTC';
 import RoomSession from 'components/RoomSession';
 import RoomLayout from 'components/RoomLayout';
 import Rebase from 're-base';
+import Firebase from 'firebase';
 
-const base = Rebase.createClass('https://lillywood.firebaseio.com/building1');
+var appPath = 'https://lillywood.firebaseio.com';
+const base = Rebase.createClass(appPath+'/building1');
 
 const userID = 'user1';
 
@@ -16,7 +18,8 @@ export class App extends React.Component {
   state = {
     users: {},
     currentRoomName: null,
-    currentUserID: null
+    currentUserID: null,
+    currentAuth: null
   };
 
   static contextTypes = {
@@ -29,6 +32,9 @@ export class App extends React.Component {
       state: 'users',
       asArray: false
     });
+    this.setState({
+      currentAuth: base.getAuth()
+    })
   }
 
   componentWillMount() {
@@ -59,9 +65,24 @@ export class App extends React.Component {
         { this.props.children }
         <RoomLayout
           roomName={this.state.currentRoomName} users={this.state.users}/>
+        {this.getLoginLogoutButton()}
       </div>
 		);
 	}
+
+  getLoginLogoutButton = () => {
+    debugger;
+    if (this.isAuthed()){
+      return (
+        <button onClick={this.logout}>Logout</button>
+      );
+    }
+    else{
+      return (
+        <button onClick={this.login}>Login</button>
+      );
+    }
+  };
 
   removeCurrentRoom = () => {
     base.post(`user/${this.state.currentUserID}/room`, {data: null});
@@ -81,6 +102,28 @@ export class App extends React.Component {
     this.removeCurrentRoom();
     router.push(`/`);
   };
+
+  login = () => {
+    base.authWithOAuthPopup("google", (error, authData) => {
+      if (error) {
+        console.log("Login Failed!", error);
+      } else {
+        this.setState({currentAuth: authData});
+        console.log("Authenticated successfully with payload:", authData);
+      }
+    });
+  };
+
+  logout = () => {
+    base.unauth();
+    this.setState({currentAuth: null});
+  };
+
+  isAuthed = () => {
+    return this.state.currentAuth != null;
+  };
+
+
 }
 
 const RoomSessionRoute = ({params, ...otherProps}) => (

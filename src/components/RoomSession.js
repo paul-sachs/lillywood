@@ -35,10 +35,7 @@ export default class RoomSession extends Component {
   };
 
   componentWillReceiveProps(nextProps) {
-    console.log("Components will receive");
     if(this.props.roomName != nextProps.roomName){
-      console.log("====1");
-      debugger;
       WebRTC.leaveRoom((error, success)=>{
         if (error){
           console.error("Failed to leave room: "+this.props.roomName);
@@ -48,27 +45,22 @@ export default class RoomSession extends Component {
           this.joinRoom(nextProps.roomName);
         }
       });
-      console.log("====2");
     }
   }
 
-  // componentWillUnmount() {
-  //   console.log("Components will unmount");
-  //   WebRTC.leaveRoom((error, success)=>{
-  //     if (error){
-  //       console.error("Failed to leave room: "+this.props.roomName);
-  //     }
-  //     else{
-  //       console.log("Successfully left room: "+this.props.roomName);
-  //     }
-  //   });
-  // }
-
-  componentDidMount() {
-    this.joinRoom(this.props.roomName);
+  componentWillUnmount() {
+    console.log("Components will unmount");
+    WebRTC.leaveRoom((error, success)=>{
+      if (error){
+        console.error("Failed to leave room: "+this.props.roomName);
+      }
+      else{
+        console.log("Successfully left room: "+this.props.roomName);
+      }
+    });
   }
 
-  componentWillMount() {
+  componentDidMount() {
     WebRTC.setLogLevel(WebRTC.LOG_LEVEL.DEBUG);
 
     WebRTC.on('readyStateChange', (state, error, room) => {
@@ -230,7 +222,7 @@ export default class RoomSession extends Component {
       }
     });
 
-
+    this.joinRoom(this.props.roomName);
   }
 
   Dispatcher = {
