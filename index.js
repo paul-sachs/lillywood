@@ -3,14 +3,17 @@ import React from 'react';
 import { render } from 'react-dom';
 import { Router, Route, Link, browserHistory } from 'react-router';
 
-import WebRTC from 'common/WebRTC';
+//import WebRTC from 'common/WebRTC';
+import FirePeer from 'utilities/FirePeer';
 import RoomSession from 'components/RoomSession';
 import RoomLayout from 'components/RoomLayout';
 import Rebase from 're-base';
 import Firebase from 'firebase';
+import 'webrtc-adapter/out/adapter.js';
 
-var appPath = 'https://lillywood.firebaseio.com';
-const base = Rebase.createClass(appPath+'/building1');
+const appPath = 'https://lillywood.firebaseio.com';
+const buildingPath = appPath+'/building1';
+const base = Rebase.createClass(buildingPath);
 
 const userID = 'user1';
 
@@ -34,20 +37,21 @@ export class App extends React.Component {
     });
     this.setState({
       currentAuth: base.getAuth()
-    })
+    });
+
   }
 
   componentWillMount() {
-    WebRTC.on('readyStateChange', (state, error, room) => {
-      if (state===2) {
-        console.log("Outer readyStateChange ...");
-        base.post(`user/${this.state.currentUserID}/room`, {data: room});
+    // WebRTC.on('readyStateChange', (state, error, room) => {
+    //   if (state===2) {
+    //     console.log("Outer readyStateChange ...");
+    //     base.post(`user/${this.state.currentUserID}/room`, {data: room});
 
-        this.setState({currentRoomName: room});
-      }
-    });
+    //     this.setState({currentRoomName: room});
+    //   }
+    // });
 
-    window.addEventListener('beforeunload', this.removeCurrentRoom);
+    // window.addEventListener('beforeunload', this.removeCurrentRoom);
   }
 
   componentWillUnmount() {
@@ -63,15 +67,13 @@ export class App extends React.Component {
         <button onClick={this.handleButton}>Join Room</button>
         <button onClick={this.leaveRoom}>Leave Room</button>
         { this.props.children }
-        <RoomLayout
-          roomName={this.state.currentRoomName} users={this.state.users}/>
+
         {this.getLoginLogoutButton()}
       </div>
 		);
 	}
 
   getLoginLogoutButton = () => {
-    debugger;
     if (this.isAuthed()){
       return (
         <button onClick={this.logout}>Logout</button>
@@ -128,9 +130,7 @@ export class App extends React.Component {
 
 const RoomSessionRoute = ({params, ...otherProps}) => (
   <div>
-    <RoomSession
-      roomName={params.roomName}
-      {...otherProps} />
+
   </div>
 );
 
