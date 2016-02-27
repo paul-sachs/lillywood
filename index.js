@@ -4,7 +4,7 @@ import { render } from 'react-dom';
 import { Router, Route, Link, browserHistory } from 'react-router';
 
 //import WebRTC from 'common/WebRTC';
-import FirePeer from 'utilities/FirePeer';
+import FireRoom from 'utilities/FireRoom';
 import RoomSession from 'components/RoomSession';
 import RoomLayout from 'components/RoomLayout';
 import Rebase from 're-base';
@@ -13,6 +13,7 @@ import 'webrtc-adapter/out/adapter.js';
 
 const appPath = 'https://lillywood.firebaseio.com';
 const buildingPath = appPath+'/building1';
+const firebase = new Firebase(buildingPath);
 const base = Rebase.createClass(buildingPath);
 
 const userID = 'user1';
@@ -22,7 +23,8 @@ export class App extends React.Component {
     users: {},
     currentRoomName: null,
     currentUserID: null,
-    currentAuth: null
+    currentAuth: null,
+    currentRoom: null
   };
 
   static contextTypes = {
@@ -94,9 +96,10 @@ export class App extends React.Component {
     const { router } = this.context;
     const roomName = this.refs.roomName.value;
 
-    this.setState({currentUserID: this.refs.userID.value}, () => {
-      router.push(`/room/${roomName}`);
-    });
+    this.state.currentRoom.connect(roomName);
+    // this.setState({currentUserID: this.refs.userID.value}, () => {
+    //   router.push(`/room/${roomName}`);
+    // });
   };
 
   leaveRoom = () => {
@@ -110,7 +113,11 @@ export class App extends React.Component {
       if (error) {
         console.log("Login Failed!", error);
       } else {
-        this.setState({currentAuth: authData});
+        const room =  new FireRoom(firebase, authData.uid);
+        this.setState({
+            currentAuth: authData,
+            currentRoom: room
+        });
         console.log("Authenticated successfully with payload:", authData);
       }
     });

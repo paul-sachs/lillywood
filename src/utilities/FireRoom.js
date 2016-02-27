@@ -1,20 +1,60 @@
-import FirePeer from './firepeer.js';
+import FirePeer from './firepeer';
+import EventEmitter from 'events';
 
-export default class FireRoom {
+function shouldMakeOffer(peerId1, peerId2) {
+  return (peerId1 < peerId2);
+}
 
-  constructor(firebaseRef, userId){
+export default class FireRoom extends EventEmitter{
+
+  constructor(firebaseRef, userId, isMuted, isVideoMuted){
+    super();
     this.rooms = firebaseRef.child('room');
     this.userId = userId;
     this.currentRoomRef = null;
-    this.myPeer = null
+    this.myPeer = null;
+    this.isMuted = isMuted;
+    this.isVideoMuted = isVideoMuted;
   }
 
   connect = (roomId) => {
     this.currentRoomRef = this.rooms.child(roomId);
 
-    this.myPeer = new FirePeer(roomRef, this.userId);
+    this.myPeer = new FirePeer(this.currentRoomRef, this.userId, this.isMuted, this.isVideoMuted);
 
-    this.setup();
+    this.currentRoomRef.on("child_added", this.handlePeerAdded);
+
+    this.currentRoomRef.on("child_removed", this.handlePeerRemoved);
+    
+    this.myPeer.on("handled_answer", this.handlePeerConnected);
+    
+    this.myPeer.on("accepted_offer", this.handlePeerConnected);
+  };
+  
+  handlePeerAdded = (snapshot) => {
+    
+    const data = snapshot.val();
+    const addedPeer = snapshot.key();
+    if (addedPeer!=this.userid && data.presence && shouldMakeOffer(this.userId, addedPeer)) {
+      this.myPeer.connect(addedPeer);
+    }
+  };
+  
+  handlePeerRemoved = (snapshot) => {
+    const data = snapshot.val();
+    const removedPeer = snapshot.key();
+    
+    if (changedPeer==this.userid){
+      return;
+    }
+    if (!data.presence) {
+      this.myPeer.disconnect(changedPeer);
+    }
+  };
+
+  
+  handlePeerConnected = (peerId, answerOrOffer) => {
+    this.emit("peer_connected", peerId);
   };
 
   disconnect = () => {
@@ -23,25 +63,4 @@ export default class FireRoom {
     this.currentRoomRef.off();
     this.currentRoomRef = null;
   };
-
-  setup = () => {
-    this.currentRoomRef.on("child_added", function(snapshot) {
-      var data = snapshot.val();
-      if (snapshot.key()!=this.userid && data.presence) {
-        this.myPeer.connect(snapshot.key());
-      }
-    });
-
-    this.currentRoomRef.on("child_changed", function(snapshot) {
-      var data = snapshot.val();
-      if (!data.presence) {
-        this.myPeer.connect(snapshot.key());
-      }
-      else {
-        this.myPeer.disconnect(snapshot.key());
-      }
-    });
-  }
-
-
 }
