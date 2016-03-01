@@ -29,13 +29,23 @@ export default class FireRoom extends EventEmitter{
     this.myPeer.on("handled_answer", this.handlePeerConnected);
     
     this.myPeer.on("accepted_offer", this.handlePeerConnected);
+    
+    this.pipeEvents("muted");
+    
+    this.pipeEvents("video_muted");
+  };
+  
+  pipeEvents = (event) => {
+    this.myPeer.on(event, (...args) => {
+      this.emit(event, ...args);
+    });
   };
   
   handlePeerAdded = (snapshot) => {
     
     const data = snapshot.val();
     const addedPeer = snapshot.key();
-    if (addedPeer!=this.userid && data.presence && shouldMakeOffer(this.userId, addedPeer)) {
+    if (addedPeer != this.userid && shouldMakeOffer(this.userId, addedPeer)) {
       this.myPeer.connect(addedPeer);
     }
   };
@@ -43,12 +53,9 @@ export default class FireRoom extends EventEmitter{
   handlePeerRemoved = (snapshot) => {
     const data = snapshot.val();
     const removedPeer = snapshot.key();
-    
-    if (changedPeer==this.userid){
-      return;
-    }
-    if (!data.presence) {
-      this.myPeer.disconnect(changedPeer);
+    if(removedPeer != this.userid){
+      this.myPeer.disconnect(removedPeer);
+      this.emit("peer_disconnected", removedPeer);
     }
   };
 
@@ -60,7 +67,20 @@ export default class FireRoom extends EventEmitter{
   disconnect = () => {
     if( this.currentRoomRef == null)
       throw new Error("Cannot disconnect when no room is connected.");
+    this.myPeer.disconnect();
     this.currentRoomRef.off();
     this.currentRoomRef = null;
   };
+  
+  muteMyMicrophone = (mute) => {
+    this.myPeer.mute(mute);
+  };
+  
+  muteMyCamera = (mute) => {
+    this.myPeer.muteVideo(mute);
+  }
+  
+  logPeerInfo = () => {
+    this.myPeer.logInfo();
+  }
 }

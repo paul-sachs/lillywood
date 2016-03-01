@@ -3,11 +3,12 @@ import EventEmitter from 'events';
 
 var configuration = {
   iceServers: [
-    {urls: "stun:stun.l.google.com:19302"}
+    {urls: "stun:stun.l.google.com:19302"},
+    {urls: "turn:numb.viagenie.ca", credential: "w0kkaw0kka", username: "paul.sachs%40influitive.com"}
   ]
 };
 export default class FirePeer extends EventEmitter {
-  constructor(firebaseRef, userId, isMuted, isVideoAvailable){
+  constructor(firebaseRef, userId, isMuted, isVideoMuted){
 
     super();    
     this.firebaseRef = firebaseRef;
@@ -16,13 +17,19 @@ export default class FirePeer extends EventEmitter {
     this.eventHandlers = {};
     this.options = { audio: true, video: true };
     this.connections = {};
-    this.presenceRef = this.userRef.child("presence");
+    // Stores mediastreams with the key being the id of the target peer
+    this.mediaStreams = {};
+    this.isMutedRef = this.userRef.child("isMuted");
+    this.isVideoMutedRef = this.userRef.child("isVideoMuted");
     this.offersRef = this.userRef.child("offers");
     this.answersRef = this.userRef.child("answers");
     this.userRef.onDisconnect().remove();
     this.isMuted = isMuted;
-    this.isVideoAvailable = isVideoAvailable;
-    this.presenceRef.set(true);
+    this.isVideoMuted = isVideoMuted;
+    
+    this.isMutedRef.set(this.isMuted);
+    this.isVideoMutedRef.set(this.isVideoMuted);
+    
     this.offersRef.on("child_added", (snapshot) => {
       const data = snapshot.val();
       const incomingPeerId = snapshot.key();
@@ -41,6 +48,16 @@ export default class FirePeer extends EventEmitter {
       });
     });
     
+    this.firebaseRef.on("child_removed", (snapshot) => {
+      const peerId = snapshot.key();
+      if (this.userId == peerId) {
+        this.handleDisconnect();
+      }
+    });
+    
+    this.isMutedRef.on("value", this.handleIsMuted);
+    
+    this.isVideoMutedRef.on("value", this.handleIsVideoMuted);
   }
 
 
@@ -50,18 +67,17 @@ export default class FirePeer extends EventEmitter {
       return;
     }
     const connection = new RTCPeerConnection(configuration);
-    const options = {
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true
-    };
     this.connections[peerId] = connection;
     this.onaddstream = this.handleAddStream;
+    
+    
     // place an offer on the room.
     const media = this.getPeerMedia();
     return media.then((mediaStream)=> {
       connection.addStream(mediaStream);
       this.emit('stream_added', { stream: mediaStream, isSelf: true});
-      return connection.createOffer(options);
+      this.mediaStreams[peerId] = mediaStream;
+      return connection.createOffer();
     }).then((desc)=> {
       return connection.setLocalDescription(desc);
     }).then(() => {
@@ -73,10 +89,38 @@ export default class FirePeer extends EventEmitter {
 
   };
   
+  disconnectFrom = (peerId) => {
+    if(this.connections[peerId]) {
+      this.connections[peerId].close();
+    }
+  };
+  
+  mute = (mute) => {
+    this.isMutedRef.set(mute);
+  };
+  
+  muteVideo = (mute) => {
+    this.isVideoMutedRef.set(mute);
+  };
+  
+  disconnect = () => {
+    this.userRef.remove();
+  };
+  
+  // Private:
+  
+  handleDisconnect = () => {
+    for (let key of Object.keys(this.connections)) {
+      this.connections[key].close();
+    }
+  }
+  
+  
   getPeerMedia = () => {
-    const media = navigator.mediaDevices.getUserMedia({ audio: !this.isMuted, video: this.isVideoAvailable});
+    const media = navigator.mediaDevices.getUserMedia(
+      { audio: !this.isMuted, video: !this.isVideoMuted}
+    );
     return media;
-      
   };
   
   handleAddStream = (event) => {
@@ -98,6 +142,8 @@ export default class FirePeer extends EventEmitter {
     remote_descr.sdp  = JSON.parse(offer);
     return media.then((mediaStream)=> {
       connection.addStream(mediaStream);
+      this.emit('stream_added', { stream: mediaStream, isSelf: true});
+      this.mediaStreams[peerId] = mediaStream;
       return connection.setRemoteDescription(remote_descr);
     }).then(()=> {
       return connection.createAnswer();
@@ -120,20 +166,50 @@ export default class FirePeer extends EventEmitter {
     }).catch(this.handleError);
   };
 
-  disconnect = (peerId) => {
-    if(peerId && this.connections[peerId]) {
-      this.connections[peerId].close();
-    }
-    else {
-      for(let connection of this.connections) {
-        connection.close();
-      }
-    }
-  };
+  
 
   handleError = (error) => {
     console.error("FirePeer: ");
     console.error(error);
   };
+  
+  handleIsMuted = (snapshot) => {
+    this.isMuted = snapshot.val();
+    for (const peerId of Object.keys(this.mediaStreams)) {
+      const stream = this.mediaStreams[peerId];
+      const audioTracks = stream.getAudioTracks();
+      for (const audioTrack of audioTracks) {
+        audioTrack.enabled = !this.isMuted;
+      }
+    }
+    this.emit("muted", this.isMuted);
+  };
+  
+  handleIsVideoMuted = (snapshot) => {
+    this.isVideoMuted = snapshot.val();
+    for (const peerId of Object.keys(this.mediaStreams)) {
+      const stream = this.mediaStreams[peerId];
+      const videoTracks = stream.getVideoTracks();
+      for (const videoTrack of videoTracks) {
+        videoTrack.enabled = !this.isVideoMuted;
+      }
+    }
+    this.emit("video_muted",  this.isVideoMuted);
+  };
+  
+  logInfo = () => {
+    for (const peerId of Object.keys(this.mediaStreams)) {
+      const stream = this.mediaStreams[peerId];
+      console.log(peerId);
+      console.log("----");
+      console.log("stream:");
+      console.log(stream);
+      console.log("audioTracks:");
+      console.log(stream.getAudioTracks());
+      console.log("videoTracks:");
+      console.log(stream.getVideoTracks());
+      console.log("----");
+    }
+  }
 
 }
